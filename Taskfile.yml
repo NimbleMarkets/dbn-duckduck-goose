@@ -1,0 +1,28 @@
+version: '3'
+
+tasks:
+  default:
+    desc: 'Default task is to "build"'
+    deps:
+      - build
+
+  list:
+    desc: 'Lists available tasks'
+    cmds:
+      - task --list-all
+
+  tidy:
+    desc: 'Tidy all'
+    cmds:
+      - go mod tidy
+
+  build:
+    desc: 'Build the web service'
+    deps: [tidy]
+    cmds:
+      - go build -o bin/dbn-duckduck-goose main.go
+
+  clean:
+    desc: 'Clean all'
+    cmds:
+      - rm -f bin/dbn-duckduck-goose

@@ -1,0 +1,8 @@
+# dbn-duckduck-goose .gitignore
+
+.task
+.DS_Store
+bin/
+dist/
+
+/*.dbn.zst
