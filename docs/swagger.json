@@ -1,0 +1,115 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "DuckDB-backed DBN Golang web service",
+        "title": "dbn-duckduck-goose",
+        "termsOfService": "file:///dev/null",
+        "contact": {
+            "name": "Neomantra Corp",
+            "url": "https://nimble.markets",
+            "email": "nosupport@nimble.markets"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://mit-license.org"
+        },
+        "version": "1.0"
+    },
+    "host": "api.example.com",
+    "basePath": "/api/v1",
+    "paths": {
+        "/last-trades/{dataset}/{ticker}": {
+            "get": {
+                "description": "Returns the last N trades by dataset and ticker.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "GET last N trades by market and ticker",
+                "operationId": "GetLastTradesByDatasetAndTicker",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "DBEQ.BASIC",
+                        "description": "DataBento dataset",
+                        "name": "dataset",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "AAPL",
+                        "description": "symbol to query",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "(optional) number of trades to return - default is 25",
+                        "name": "count",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "array of TradeTicks",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/sdk.TradeTick"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "dataset not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "sdk.TradeTick": {
+            "type": "object",
+            "properties": {
+                "mkt": {
+                    "description": "Market of the trade",
+                    "type": "string",
+                    "example": "Q"
+                },
+                "ns": {
+                    "description": "Nanoseconds portion of the event timestamp",
+                    "type": "integer",
+                    "example": 123456
+                },
+                "px": {
+                    "description": "Trade price",
+                    "type": "number",
+                    "example": 214.21
+                },
+                "sym": {
+                    "description": "Ticker of the trade",
+                    "type": "string",
+                    "example": "AAPL"
+                },
+                "sz": {
+                    "description": "Trade size/volume",
+                    "type": "integer",
+                    "example": 100
+                },
+                "ts": {
+                    "description": "Trade event timestamp as seconds from the epoch",
+                    "type": "string",
+                    "example": "1713644400"
+                }
+            }
+        }
+    }
+}

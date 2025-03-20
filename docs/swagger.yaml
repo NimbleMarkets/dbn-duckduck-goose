@@ -1,0 +1,83 @@
+basePath: /api/v1
+definitions:
+  sdk.TradeTick:
+    properties:
+      mkt:
+        description: Market of the trade
+        example: Q
+        type: string
+      ns:
+        description: Nanoseconds portion of the event timestamp
+        example: 123456
+        type: integer
+      px:
+        description: Trade price
+        example: 214.21
+        type: number
+      sym:
+        description: Ticker of the trade
+        example: AAPL
+        type: string
+      sz:
+        description: Trade size/volume
+        example: 100
+        type: integer
+      ts:
+        description: Trade event timestamp as seconds from the epoch
+        example: "1713644400"
+        type: string
+    type: object
+host: api.example.com
+info:
+  contact:
+    email: nosupport@nimble.markets
+    name: Neomantra Corp
+    url: https://nimble.markets
+  description: DuckDB-backed DBN Golang web service
+  license:
+    name: MIT
+    url: https://mit-license.org
+  termsOfService: file:///dev/null
+  title: dbn-duckduck-goose
+  version: "1.0"
+paths:
+  /last-trades/{dataset}/{ticker}:
+    get:
+      description: Returns the last N trades by dataset and ticker.
+      operationId: GetLastTradesByDatasetAndTicker
+      parameters:
+      - description: DataBento dataset
+        example: DBEQ.BASIC
+        in: path
+        name: dataset
+        required: true
+        type: string
+      - description: symbol to query
+        example: AAPL
+        in: path
+        name: ticker
+        required: true
+        type: string
+      - description: (optional) number of trades to return - default is 25
+        in: query
+        name: count
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: array of TradeTicks
+          schema:
+            items:
+              $ref: '#/definitions/sdk.TradeTick'
+            type: array
+        "404":
+          description: dataset not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: GET last N trades by market and ticker
+schemes:
+- http
+swagger: "2.0"
