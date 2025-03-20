@@ -6,3 +6,4 @@ bin/
 dist/
 
 /*.dbn.zst
+*.log

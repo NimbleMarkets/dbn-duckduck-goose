@@ -11,10 +11,28 @@ tasks:
     cmds:
       - task --list-all
 
+  # Things we need to install to do dev work
+  dev-deps:
+    cmds:
+      - go install "github.com/swaggo/swag/cmd/swag@v1.16.3"
+
+  # Run this before committing
+  # Mostly auto-generated things that are harder to do in CI
+  pre-commit:
+    deps:
+      - server-swag-v3
+
   tidy:
     desc: 'Tidy all'
+    deps: [server-swag-v2]
     cmds:
       - go mod tidy
+    sources:
+      - "*.go"
+      - "handlers/**/*.go"
+      - "sdk/**/*.go"
+      - go.mod
+      - go.sum
 
   build:
     desc: 'Build the web service'
@@ -22,7 +40,24 @@ tasks:
     cmds:
       - go build -o bin/dbn-duckduck-goose main.go
 
+  server-swag-v2: 
+    cmds:
+      - swag init --parseDependency --parseDepth 2 -o ./docs -g ./main.go
+    sources:
+      - "*.go"
+      - "handlers/**/*.go"
+      - "sdk/**/*.go"
+    generates:
+      - ./docs/docs.go
+      - ./docs/swagger.json
+      - ./docs/swagger.yaml
+
+  swag-clean:
+    cmds:
+      - rm -f docs/docs.go docs/swagger.json docs/swagger.yaml
+
   clean:
     desc: 'Clean all'
+    deps: [swag-clean]
     cmds:
       - rm -f bin/dbn-duckduck-goose

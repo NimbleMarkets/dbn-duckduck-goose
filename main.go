@@ -13,13 +13,21 @@ import (
 
 	dbn "github.com/NimbleMarkets/dbn-go"
 	dbn_live "github.com/NimbleMarkets/dbn-go/live"
+	ginzap "github.com/gin-contrib/zap"
+	"github.com/gin-gonic/gin"
+	"github.com/penglongli/gin-metrics/ginmetrics"
 	"github.com/relvacode/iso8601"
 	"github.com/spf13/pflag"
+	"go.uber.org/zap"
+
+	"github.com/NimbleMarkets/dbn-duckduck-goose/handlers"
+	"github.com/NimbleMarkets/dbn-duckduck-goose/middleware"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
 
 type Config struct {
+	HostPort    string
 	OutFilename string
 	ApiKey      string
 	Dataset     string
@@ -33,6 +41,23 @@ type Config struct {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// OpenAPI Documentation
+//
+//	@title			dbn-duckduck-goose
+//	@version		1.0
+//	@termsOfService	file:///dev/null
+//	@description	DuckDB-backed DBN Golang web service
+//
+//	@contact.name	Neomantra Corp
+//	@contact.url	https://nimble.markets
+//	@contact.email	nosupport@nimble.markets
+//
+// @license.name	MIT
+// @license.url		https://mit-license.org
+//
+//	@BasePath					/api/v1
+//	@Host						api.example.com
+//	@Schemes					http
 
 func main() {
 	var err error
@@ -41,19 +66,21 @@ func main() {
 	var showHelp bool
 
 	config.STypeIn = dbn.SType_RawSymbol
+	config.Encoding = dbn.Encoding_Dbn
 
-	pflag.StringVarP(&config.Dataset, "dataset", "d", "", "Dataset to subscribe to ")
+	pflag.StringVarP(&config.HostPort, "hostport", "p", "localhost:8888", "'host:port' to service HTTP")
+	pflag.StringVarP(&config.Dataset, "dataset", "d", "", "Dataset to subscribe to")
 	pflag.StringArrayVarP(&config.Schemas, "schema", "s", []string{}, "Schema to subscribe to (multiple allowed)")
 	pflag.StringVarP(&config.ApiKey, "key", "k", "", "Databento API key (or set 'DATABENTO_API_KEY' envvar)")
 	pflag.StringVarP(&config.OutFilename, "out", "o", "", "Output filename for DBN stream ('-' for stdout)")
 	pflag.VarP(&config.STypeIn, "sin", "i", "Input SType of the symbols. One of instrument_id, id, instr, raw_symbol, raw, smart, continuous, parent, nasdaq, cms")
-	pflag.VarP(&config.Encoding, "encoding", "e", "Encoding of the output ('dbn', 'csv', 'json')")
 	pflag.StringVarP(&startTimeArg, "start", "t", "", "Start time to request as ISO 8601 format (default: now)")
 	pflag.BoolVarP(&config.Snapshot, "snapshot", "n", false, "Enable snapshot on subscription request")
 	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Verbose logging")
 	pflag.BoolVarP(&showHelp, "help", "h", false, "Show help")
 	pflag.Parse()
 
+	// therese are pre-loaded subscription requests
 	config.Symbols = pflag.Args()
 
 	if showHelp {
@@ -80,18 +107,46 @@ func main() {
 		os.Exit(1)
 	}
 
-	if len(config.Symbols) == 0 {
-		fmt.Fprintf(os.Stderr, "requires at least one symbol argument\n")
-		os.Exit(1)
-	}
-
 	requireValOrExit(config.Dataset, "missing required --dataset")
 	requireValOrExit(config.OutFilename, "missing required --out")
 
-	if err := run(config); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
-		os.Exit(1)
-	}
+	// logger setup
+	isRelease := (gin.Mode() == gin.ReleaseMode) // GIN_MODE="release"
+	logger := middleware.CreateLogger("dbn-duckduck-goose", isRelease)
+	defer logger.Sync()
+
+	// Gin webserver setup
+	router := gin.New()
+	router.Use(ginzap.Ginzap(logger, time.RFC3339, true))
+	router.Use(ginzap.RecoveryWithZap(logger, true))
+	router.Use(middleware.SetGinLogger(logger))
+	router.Use(gin.Recovery()) // recover from panics and return 500
+
+	// prometheus metrics middleware
+	m := ginmetrics.GetMonitor()
+	m.SetMetricPath("/metrics")
+	// cutoff for slow request metric in seconds
+	m.SetSlowTime(5)
+	// request duration histogram buckets in seconds - used to p95, p99
+	// default {0.1, 0.3, 1.2, 5, 10}
+	m.SetDuration([]float64{0.1, 0.3, 1.2, 5, 10})
+	m.Use(router)
+
+	// Register our service's handlers/routes
+	handlers.Register(config.HostPort, router, logger)
+
+	// quick-and-dirty hoist the feed handler to a goroutine
+	go func() {
+		if err := runDbnLiveServer(config); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
+			os.Exit(1)
+		}
+	}()
+
+	// Run the web server in this goroutine
+	logger.Info("Starting server", zap.String("hostport", config.HostPort))
+	router.Run(config.HostPort)
+	logger.Info("Server stopped")
 }
 
 // requireValOrExit exits with an error message if `val` is empty.
@@ -104,7 +159,7 @@ func requireValOrExit(val string, errstr string) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-func run(config Config) error {
+func runDbnLiveServer(config Config) error {
 	// Create output file before connecting
 	outWriter, outCloser, err := dbn.MakeCompressedWriter(config.OutFilename, false)
 	if err != nil {
@@ -131,17 +186,19 @@ func run(config Config) error {
 		return fmt.Errorf("failed to authenticate LiveClient: %w", err)
 	}
 
-	// Subscribe
-	for _, schema := range config.Schemas {
-		subRequest := dbn_live.SubscriptionRequestMsg{
-			Schema:   schema,
-			StypeIn:  config.STypeIn,
-			Symbols:  config.Symbols,
-			Start:    config.StartTime,
-			Snapshot: config.Snapshot,
-		}
-		if err = client.Subscribe(subRequest); err != nil {
-			return fmt.Errorf("failed to subscribe LiveClient: %w", err)
+	// Pre-subscribe to symbols
+	if len(config.Symbols) != 0 {
+		for _, schema := range config.Schemas {
+			subRequest := dbn_live.SubscriptionRequestMsg{
+				Schema:   schema,
+				StypeIn:  config.STypeIn,
+				Symbols:  config.Symbols,
+				Start:    config.StartTime,
+				Snapshot: config.Snapshot,
+			}
+			if err = client.Subscribe(subRequest); err != nil {
+				return fmt.Errorf("failed to subscribe LiveClient: %w", err)
+			}
 		}
 	}
 
