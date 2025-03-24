@@ -92,6 +92,11 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 123456
                 },
+                "pub": {
+                    "description": "DataBento Publisher ID",
+                    "type": "integer",
+                    "example": 1
+                },
                 "px": {
                     "description": "Trade price",
                     "type": "number",

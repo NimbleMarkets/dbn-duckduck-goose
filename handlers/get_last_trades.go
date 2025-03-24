@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/NimbleMarkets/dbn-duckduck-goose/sdk"
 	"github.com/gin-gonic/gin"
 )
+
+const defaultCountArg = 25
 
 // Get last trades by Dataset and Ticker
 //
@@ -37,7 +40,7 @@ func GetLastTradesByDatasetAndTicker(c *gin.Context) {
 		return
 	}
 
-	count := 25
+	count := defaultCountArg
 	if countStr := c.Query("count"); countStr != "" {
 		validatedCount, err := middleware.ValidatePositiveNonzeroInteger(countStr)
 		if err != nil {
@@ -50,7 +53,7 @@ func GetLastTradesByDatasetAndTicker(c *gin.Context) {
 	// perform the query
 	results, err := queryLastTradesByDatasetAndTicker(ticker, dataset, count)
 	if err != nil {
-		error := fmt.Sprintf("getTradeTicksByTickerMarket error for ticker:%s dataset: %s", ticker, dataset)
+		error := fmt.Sprintf("getTradeTicksByTickerMarket error for ticker:%s dataset:%s", ticker, dataset)
 		middleware.InternalError(c, error, err)
 		return
 	}
@@ -62,6 +65,27 @@ func GetLastTradesByDatasetAndTicker(c *gin.Context) {
 
 // queryLastTradesByDatasetAndTicker stub for actual implementation later
 func queryLastTradesByDatasetAndTicker(ticker string, dataset string, count int) ([]*sdk.TradeTick, error) {
-	// we will fill this out later
-	return nil, nil
+	if count <= 0 {
+		count = defaultCountArg
+	}
+	queryStr := `SELECT timestamp, nanos, publisher, ticker, CAST(price AS DOUBLE), shares FROM trades
+WHERE ticker = ? ORDER BY timestamp DESC LIMIT ?;`
+
+	// query the global DuckDB connection
+	rows, err := gDuckdbConn.QueryContext(context.Background(), queryStr, ticker, count)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ticks []*sdk.TradeTick
+	for rows.Next() {
+		tick := new(sdk.TradeTick)
+		err := rows.Scan(&tick.Timestamp, &tick.Nanos, &tick.PublisherID, &tick.Ticker, &tick.Price, &tick.Shares)
+		if err != nil {
+			return nil, err
+		}
+		ticks = append(ticks, tick)
+	}
+	return ticks, nil
 }

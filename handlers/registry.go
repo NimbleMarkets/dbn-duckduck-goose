@@ -3,6 +3,8 @@
 package handlers
 
 import (
+	"database/sql"
+
 	"github.com/NimbleMarkets/dbn-duckduck-goose/docs"
 	"github.com/NimbleMarkets/dbn-duckduck-goose/middleware"
 
@@ -13,8 +15,16 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// Global storage of database --
+var (
+	gDuckdbConn *sql.DB
+)
+
 // Register registers our custom Appplication with the passed gin.Engine
-func Register(hostPort string, r *gin.Engine, logger *zap.Logger) *gin.Engine {
+func Register(hostPort string, conn *sql.DB, r *gin.Engine, logger *zap.Logger) *gin.Engine {
+	// Set module DuckDB connection
+	gDuckdbConn = conn
+
 	// Register swagger docs
 	docs.SwaggerInfo.Host = hostPort
 	r = RegisterOpenApiDocs(r)

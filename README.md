@@ -26,13 +26,17 @@ $ task build
 
 # run server
 $ export DATABENTO_API_KEY="<your_api_key>"
-$ ./bin/dbn-duckduck-goose --dataset DBEQ.BASIC --schema ohlcv-1h --out foo.dbn.zst
+$ ./bin/dbn-duckduck-goose --dataset DBEQ.BASIC --out qqq.dbn.zst QQQ
 
 # then in another terminal, read the specification
 $ curl -v http://localhost:8888/docs/doc.json | less
 
-# or open the Web GUI in in a web browaser
+# or open the Web GUI in in a web browser
 $ open http://localhost:8888/docs/index.html
+
+# query for latest trades
+$ curl http://localhost:8888/api/v1/last-trades/DBEQ.BASIC/QQQ
+
 ```
 
 ## Usage
@@ -45,26 +49,29 @@ The following environment variables control some behavior:
 | `GIN_MODE` | "debug" | Affects logging and [Gin](https://gin-gonic.com/docs/deployment/). May be `debug`, `release`, or `test` |
 
 ```
-usage: ./bin/dbn-duckduck-goose -d <dataset> -s <schema> [opts] symbol1 symbol2 ...
+usage: ./bin/dbn-duckduck-goose -d <dataset> [opts] symbol1 symbol2 ...
 
-  -d, --dataset string          Dataset to subscribe to 
-  -e, --encoding dbn.Encoding   Encoding of the output ('dbn', 'csv', 'json') (default dbn)
-  -h, --help                    Show help
-  -k, --key string              Databento API key (or set 'DATABENTO_API_KEY' envvar)
-  -o, --out string              Output filename for DBN stream ('-' for stdout)
-  -s, --schema stringArray      Schema to subscribe to (multiple allowed)
-  -i, --sin dbn.SType           Input SType of the symbols. One of instrument_id, id, instr, raw_symbol, raw, smart, continuous, parent, nasdaq, cms (default raw_symbol)
-  -n, --snapshot                Enable snapshot on subscription request
-  -t, --start string            Start time to request as ISO 8601 format (default: now)
-  -v, --verbose                 Verbose logging
+  -d, --dataset string    Dataset to subscribe to
+      --db string         DuckDB datate file to use (default: ':memory:')
+  -h, --help              Show help
+  -p, --hostport string   'host:port' to service HTTP (default "localhost:8888")
+  -k, --key string        Databento API key (or set 'DATABENTO_API_KEY' envvar)
+  -o, --out string        Output filename for DBN stream ('-' for stdout)
+  -n, --snapshot          Enable snapshot on subscription request
+  -t, --start string      Start time to request as ISO 8601 format (default: now)
+  -v, --verbose           Verbose logging```
+
+
+## Building the project
+
+Building depends on Taskfile [Taskfile](https://taskfile.dev)) and [Swag](https://github.com/swaggo/swag) for OpenAPI generation. Install the latter with `go install github.com/swaggo/swag/cmd/swag@latest` or `task dev-deps`.  Run `task build` to build the binary.
+
+```sh
+# Quickstart for OSX users
+$ brew install go-task/tap/go-task
+$ task dev-deps
+$ task build
 ```
-
-
-## Building
-
-Building depends on Taskfile [Taskfile](https://taskfile.dev)) and [Swag](https://github.com/swaggo/swag) for OpenAPI generation. Install the latter with `go install github.com/swaggo/swag/cmd/swag@latest` or `task dev-deps`.
-
-Run `task build` to build the binary.
 
 ## License
 

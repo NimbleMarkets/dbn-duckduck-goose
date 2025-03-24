@@ -6,7 +6,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"os"
 	"time"
@@ -22,18 +24,20 @@ import (
 
 	"github.com/NimbleMarkets/dbn-duckduck-goose/handlers"
 	"github.com/NimbleMarkets/dbn-duckduck-goose/middleware"
+
+	"database/sql"
+
+	_ "github.com/marcboeker/go-duckdb"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
 
 type Config struct {
+	DuckDBFile  string
 	HostPort    string
 	OutFilename string
 	ApiKey      string
 	Dataset     string
-	STypeIn     dbn.SType
-	Encoding    dbn.Encoding
-	Schemas     []string
 	Symbols     []string
 	StartTime   time.Time
 	Snapshot    bool
@@ -65,15 +69,11 @@ func main() {
 	var startTimeArg string
 	var showHelp bool
 
-	config.STypeIn = dbn.SType_RawSymbol
-	config.Encoding = dbn.Encoding_Dbn
-
+	pflag.StringVarP(&config.DuckDBFile, "db", "", "", "DuckDB datate file to use (default: ':memory:')")
 	pflag.StringVarP(&config.HostPort, "hostport", "p", "localhost:8888", "'host:port' to service HTTP")
 	pflag.StringVarP(&config.Dataset, "dataset", "d", "", "Dataset to subscribe to")
-	pflag.StringArrayVarP(&config.Schemas, "schema", "s", []string{}, "Schema to subscribe to (multiple allowed)")
 	pflag.StringVarP(&config.ApiKey, "key", "k", "", "Databento API key (or set 'DATABENTO_API_KEY' envvar)")
 	pflag.StringVarP(&config.OutFilename, "out", "o", "", "Output filename for DBN stream ('-' for stdout)")
-	pflag.VarP(&config.STypeIn, "sin", "i", "Input SType of the symbols. One of instrument_id, id, instr, raw_symbol, raw, smart, continuous, parent, nasdaq, cms")
 	pflag.StringVarP(&startTimeArg, "start", "t", "", "Start time to request as ISO 8601 format (default: now)")
 	pflag.BoolVarP(&config.Snapshot, "snapshot", "n", false, "Enable snapshot on subscription request")
 	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Verbose logging")
@@ -84,7 +84,7 @@ func main() {
 	config.Symbols = pflag.Args()
 
 	if showHelp {
-		fmt.Fprintf(os.Stdout, "usage: %s -d <dataset> -s <schema> [opts] symbol1 symbol2 ...\n\n", os.Args[0])
+		fmt.Fprintf(os.Stdout, "usage: %s -d <dataset> [opts] symbol1 symbol2 ...\n\n", os.Args[0])
 		pflag.PrintDefaults()
 		os.Exit(0)
 	}
@@ -102,11 +102,6 @@ func main() {
 		requireValOrExit(config.ApiKey, "missing Databento API key, use --key or set DATABENTO_API_KEY envvar\n")
 	}
 
-	if len(config.Schemas) == 0 {
-		fmt.Fprintf(os.Stderr, "requires at least --schema argument\n")
-		os.Exit(1)
-	}
-
 	requireValOrExit(config.Dataset, "missing required --dataset")
 	requireValOrExit(config.OutFilename, "missing required --out")
 
@@ -114,6 +109,17 @@ func main() {
 	isRelease := (gin.Mode() == gin.ReleaseMode) // GIN_MODE="release"
 	logger := middleware.CreateLogger("dbn-duckduck-goose", isRelease)
 	defer logger.Sync()
+
+	// DuckDB setup
+	if config.DuckDBFile == "" {
+		logger.Warn("no DuckDB file specified, using in-memory database")
+	}
+	duckdbConn, err := sql.Open("duckdb", config.DuckDBFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "duckdb failed to open: %s\n", err.Error())
+		os.Exit(1)
+	}
+	defer duckdbConn.Close()
 
 	// Gin webserver setup
 	router := gin.New()
@@ -133,11 +139,11 @@ func main() {
 	m.Use(router)
 
 	// Register our service's handlers/routes
-	handlers.Register(config.HostPort, router, logger)
+	handlers.Register(config.HostPort, duckdbConn, router, logger)
 
 	// quick-and-dirty hoist the feed handler to a goroutine
 	go func() {
-		if err := runDbnLiveServer(config); err != nil {
+		if err := runDbnLiveServer(config, duckdbConn); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
 			os.Exit(1)
 		}
@@ -159,7 +165,9 @@ func requireValOrExit(val string, errstr string) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-func runDbnLiveServer(config Config) error {
+var dbnLiveSchemas = []string{"trades"}
+
+func runDbnLiveServer(config Config, duckdbConn *sql.DB) error {
 	// Create output file before connecting
 	outWriter, outCloser, err := dbn.MakeCompressedWriter(config.OutFilename, false)
 	if err != nil {
@@ -171,7 +179,7 @@ func runDbnLiveServer(config Config) error {
 	client, err := dbn_live.NewLiveClient(dbn_live.LiveConfig{
 		ApiKey:               config.ApiKey,
 		Dataset:              config.Dataset,
-		Encoding:             config.Encoding,
+		Encoding:             dbn.Encoding_Dbn,
 		SendTsOut:            false,
 		VersionUpgradePolicy: dbn.VersionUpgradePolicy_AsIs,
 		Verbose:              config.Verbose,
@@ -188,10 +196,10 @@ func runDbnLiveServer(config Config) error {
 
 	// Pre-subscribe to symbols
 	if len(config.Symbols) != 0 {
-		for _, schema := range config.Schemas {
+		for _, schema := range dbnLiveSchemas {
 			subRequest := dbn_live.SubscriptionRequestMsg{
 				Schema:   schema,
-				StypeIn:  config.STypeIn,
+				StypeIn:  dbn.SType_RawSymbol,
 				Symbols:  config.Symbols,
 				Start:    config.StartTime,
 				Snapshot: config.Snapshot,
@@ -202,19 +210,30 @@ func runDbnLiveServer(config Config) error {
 		}
 	}
 
-	// Start session
+	// Run the templated database migrations on DuckDB
+	tableName := "trades"
+	migrationTempl, err := template.New("tradeMigration").Parse(migrationTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to create template migration: %w", err)
+	}
+	var migrationBytes bytes.Buffer
+	if err = migrationTempl.Execute(&migrationBytes, MigrationInfo{TableName: tableName}); err != nil {
+		return fmt.Errorf("failed to template migration: %w", err)
+	}
+	_, err = duckdbConn.Exec(migrationBytes.String())
+	if err != nil {
+		return fmt.Errorf("failed to execute query: %w", err)
+	}
+
+	// Start DataBento Live session
 	if err = client.Start(); err != nil {
 		return fmt.Errorf("failed to start LiveClient: %w", err)
 	}
 
-	if config.Encoding == dbn.Encoding_Dbn {
-		return followStreamDBN(client, outWriter)
-	} else {
-		return followStreamJSON(client, outWriter)
-	}
+	return followStreamDBN(client, outWriter, duckdbConn, "trades")
 }
 
-func followStreamDBN(client *dbn_live.LiveClient, outWriter io.Writer) error {
+func followStreamDBN(client *dbn_live.LiveClient, outWriter io.Writer, duckdbConn *sql.DB, tableName string) error {
 	// Write metadata to file
 	dbnScanner := client.GetDbnScanner()
 	if dbnScanner == nil {
@@ -228,13 +247,44 @@ func followStreamDBN(client *dbn_live.LiveClient, outWriter io.Writer) error {
 		return fmt.Errorf("failed to write metadata from LiveClient: %w", err)
 	}
 
+	// Setup symbol map
+	dbnSymbolMap := dbn.NewPitSymbolMap()
+	midTime := metadata.Start + (metadata.End-metadata.Start)/2
+	dbnSymbolMap.FillFromMetadata(metadata, midTime)
+
 	// Follow the DBN stream, writing DBN messages to the file
 	for dbnScanner.Next() {
 		recordBytes := dbnScanner.GetLastRecord()[:dbnScanner.GetLastSize()]
 		_, err := outWriter.Write(recordBytes)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to write record: %s\n", err.Error())
-			return err
+			return fmt.Errorf("failed to write record: %w", err)
+		}
+
+		// write trade files to DuckDB
+		header, err := dbnScanner.GetLastHeader()
+		if err != nil {
+			return fmt.Errorf("failed to read header: %w", err)
+		}
+		switch header.RType {
+		case dbn.RType_Mbp0: // trade
+			tradeRecord, err := dbn.DbnScannerDecode[dbn.Mbp0Msg](dbnScanner)
+			if err != nil {
+				return fmt.Errorf("failed to read Mbp0Msg: %w", err)
+			}
+
+			err = insertTrade(duckdbConn, tableName, tradeRecord, dbnSymbolMap)
+			if err != nil {
+				return fmt.Errorf("failed to insert trade: %w", err)
+			}
+		case dbn.RType_SymbolMapping: // symbol mapping
+			mappingRecord, err := dbnScanner.DecodeSymbolMappingMsg()
+			if err != nil {
+				return fmt.Errorf("failed to read SymbolMappingMsg: %w", err)
+			}
+			err = dbnSymbolMap.OnSymbolMappingMsg(mappingRecord)
+			if err != nil {
+				return fmt.Errorf("failed to handle SymbolMappingMsg: %w", err)
+			}
 		}
 	}
 	if err := dbnScanner.Error(); err != nil && err != io.EOF {
@@ -244,24 +294,50 @@ func followStreamDBN(client *dbn_live.LiveClient, outWriter io.Writer) error {
 	return nil
 }
 
-func followStreamJSON(client *dbn_live.LiveClient, outWriter io.Writer) error {
-	// Get the JSON scanner
-	jsonScanner := client.GetJsonScanner()
-	if jsonScanner == nil {
-		return fmt.Errorf("failed to get JsonScanner from LiveClient")
-	}
-	// Follow the JSON stream, writing JSON messages to the file
-	for jsonScanner.Next() {
-		recordBytes := jsonScanner.GetLastRecord()
-		_, err := outWriter.Write(recordBytes)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to write record: %s\n", err.Error())
-			return err
-		}
-	}
-	if err := jsonScanner.Error(); err != nil && err != io.EOF {
-		fmt.Fprintf(os.Stderr, "scanner err: %s\n", err.Error())
-		return err
+///////////////////////////////////////////////////////////////////////////////
+
+// MigrationInfo holds data to be injected by our migration template
+type MigrationInfo struct {
+	TableName string
+}
+
+// tradeMigrationTempl is the SQL format string
+// Takes the "table_name"
+var migrationTemplate string = `
+-- Create trades table
+CREATE TABLE IF NOT EXISTS {{.TableName}} (
+	date date NOT NULL,
+	timestamp integer NOT NULL,
+	nanos integer NOT NULL,
+	publisher integer NOT NULL,
+	ticker varchar(12) NOT NULL,
+	price decimal(19,3) NOT NULL,
+	shares integer NOT NULL
+);
+-- Create indices
+CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_date_ticker_timestamp_idx ON {{.TableName}} (publisher, date, ticker, timestamp);
+CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_ticker_date_timestamp_idx ON {{.TableName}} (publisher, ticker, date, timestamp);
+CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_timestamp_ticker_idx ON {{.TableName}} (publisher, timestamp, ticker);
+CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_ticker_timestamp_idx ON {{.TableName}} (publisher, ticker, timestamp);
+`
+
+// insertTrade inserts a trade record into DuckDB
+func insertTrade(duckdbConn *sql.DB, tableName string, tradeRecord *dbn.Mbp0Msg, dbnSymbolMap *dbn.PitSymbolMap) error {
+	timestamp, nanos := dbn.TimestampToSecNanos(tradeRecord.Header.TsEvent) // thanks dbn-go!
+	micros := timestamp + nanos/1_000
+	ticker := dbnSymbolMap.Get(tradeRecord.Header.InstrumentID)
+
+	sqlFormat := `INSERT INTO %s (date, timestamp, nanos, publisher, ticker, price, shares)
+VALUES (MAKE_TIMESTAMP(%d), %d, %d, %d, '%s', %f, %d)
+ON CONFLICT DO NOTHING;`
+	queryStr := fmt.Sprintf(sqlFormat, tableName,
+		micros, timestamp, nanos, tradeRecord.Header.PublisherID,
+		ticker, dbn.Fixed9ToFloat64(tradeRecord.Price), tradeRecord.Size,
+	)
+
+	_, err := duckdbConn.Exec(queryStr)
+	if err != nil {
+		return fmt.Errorf("failed to execute query: %w", err)
 	}
 	return nil
 }

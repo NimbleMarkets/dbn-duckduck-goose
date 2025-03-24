@@ -10,6 +10,10 @@ definitions:
         description: Nanoseconds portion of the event timestamp
         example: 123456
         type: integer
+      pub:
+        description: DataBento Publisher ID
+        example: 1
+        type: integer
       px:
         description: Trade price
         example: 214.21

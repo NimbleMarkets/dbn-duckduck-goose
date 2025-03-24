@@ -10,6 +10,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/main.go",
+            "buildFlags": "-tags=no_duckdb_arrow", // Workaround for arm64 issue?
             "env": {
                 "ALLOWED_ORIGINS": "*",
                 "GIN_DEBUG": "true",
@@ -17,8 +18,10 @@
             },
             "args": [
                 "--dataset", "DBEQ.BASIC",
-                "--schema", "ohlcv-1h",
                 "--out", "foo.log",
+                "--db", "foo.duckdb",
+                "--start", "2025-03-24T06:35:46-04:00",
+                "QQQ"
             ]
         },
     ]
