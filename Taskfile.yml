@@ -30,6 +30,7 @@ tasks:
     sources:
       - "*.go"
       - "handlers/**/*.go"
+      - "livedata/**/*.go"
       - "sdk/**/*.go"
       - go.mod
       - go.sum
@@ -39,6 +40,13 @@ tasks:
     deps: [tidy]
     cmds:
       - go build -o bin/dbn-duckduck-goose main.go
+    sources:
+      - "*.go"
+      - "handlers/**/*.go"
+      - "livedata/**/*.go"
+      - "sdk/**/*.go"
+      - go.mod
+      - go.sum
 
   server-swag-v2: 
     cmds:
@@ -46,6 +54,7 @@ tasks:
     sources:
       - "*.go"
       - "handlers/**/*.go"
+      - "livedata/**/*.go"
       - "sdk/**/*.go"
     generates:
       - ./docs/docs.go
