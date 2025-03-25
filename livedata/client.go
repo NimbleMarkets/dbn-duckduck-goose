@@ -3,12 +3,13 @@
 package livedata
 
 import (
-	"bytes"
 	"database/sql"
+	_ "embed" // Required for go:embed
 	"fmt"
 	"io"
 	"os"
-	"text/template"
+
+	"github.com/NimbleMarkets/dbn-duckduck-goose/middleware"
 
 	"github.com/NimbleMarkets/dbn-go"
 	dbn_live "github.com/NimbleMarkets/dbn-go/live"
@@ -99,17 +100,13 @@ func NewLiveDataClient(config LiveDataConfig, duckdbConn *sql.DB) (*LiveDataClie
 	}
 
 	// Run the templated database migrations on DuckDB
-	migrationTempl, err := template.New("tradeMigration").Parse(migrationTemplate)
+	err = middleware.RunMigration(duckdbConn, middleware.TradeMigrationTemplate, middleware.MigrationInfo{
+		MigrationName: "tradeMigration",
+		TableName:     liveDataClient.tableName,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create template migration: %w", err)
-	}
-	var migrationBytes bytes.Buffer
-	if err = migrationTempl.Execute(&migrationBytes, MigrationInfo{TableName: liveDataClient.tableName}); err != nil {
-		return nil, fmt.Errorf("failed to template migration: %w", err)
-	}
-	_, err = duckdbConn.Exec(migrationBytes.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("failed to run trade migration: %w", err)
+
 	}
 
 	// Start DataBento Live session
@@ -164,7 +161,7 @@ func (c *LiveDataClient) FollowStream() error {
 		return fmt.Errorf("failed to write metadata from LiveClient: %w", err)
 	}
 
-	// Setup symbol map
+	// Initialize symbol map
 	midTime := metadata.Start + (metadata.End-metadata.Start)/2
 	c.dbnSymbolMap.FillFromMetadata(metadata, midTime)
 
@@ -181,7 +178,6 @@ func (c *LiveDataClient) FollowStream() error {
 		if err != nil {
 			return fmt.Errorf("failed to write record: %w", err)
 		}
-
 	}
 
 	if err := dbnScanner.Error(); err != nil && err != io.EOF {
@@ -190,33 +186,6 @@ func (c *LiveDataClient) FollowStream() error {
 	}
 	return nil
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-// MigrationInfo holds data to be injected by our migration template
-type MigrationInfo struct {
-	TableName string
-}
-
-// tradeMigrationTempl is the SQL format string
-// Takes the "table_name"
-var migrationTemplate string = `
--- Create trades table
-CREATE TABLE IF NOT EXISTS {{.TableName}} (
-	date date NOT NULL,
-	timestamp integer NOT NULL,
-	nanos integer NOT NULL,
-	publisher integer NOT NULL,
-	ticker varchar(12) NOT NULL,
-	price decimal(19,3) NOT NULL,
-	shares integer NOT NULL
-);
--- Create indices
-CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_date_ticker_timestamp_idx ON {{.TableName}} (publisher, date, ticker, timestamp);
-CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_ticker_date_timestamp_idx ON {{.TableName}} (publisher, ticker, date, timestamp);
-CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_timestamp_ticker_idx ON {{.TableName}} (publisher, timestamp, ticker);
-CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_ticker_timestamp_idx ON {{.TableName}} (publisher, ticker, timestamp);
-`
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -232,7 +201,6 @@ func NewLiveDataVisitor(client *LiveDataClient) *LiveDataVisitor {
 
 // OnMbp0 will insert the trade into the client's DuckDB
 func (v *LiveDataVisitor) OnMbp0(tradeRecord *dbn.Mbp0Msg) error {
-	//func insertTrade(duckdbConn *sql.DB, tableName string, tradeRecord *dbn.Mbp0Msg, dbnSymbolMap *dbn.PitSymbolMap) error {
 	timestamp, nanos := dbn.TimestampToSecNanos(tradeRecord.Header.TsEvent) // thanks dbn-go!
 	micros := timestamp + nanos/1_000
 	ticker := v.c.dbnSymbolMap.Get(tradeRecord.Header.InstrumentID)
