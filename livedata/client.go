@@ -25,6 +25,7 @@ type LiveDataClient struct {
 	tableName  string
 
 	dbnClient    *dbn_live.LiveClient
+	dbnVisitor   *LiveDataVisitor
 	dbnSymbolMap *dbn.PitSymbolMap
 
 	outWriter io.Writer
@@ -35,13 +36,15 @@ type LiveDataClient struct {
 // It will connect, authenticate, pre-subscribe any symbols, and start the streaming
 // Returns nil and an error, if any
 func NewLiveDataClient(config LiveDataConfig, duckdbConn *sql.DB) (*LiveDataClient, error) {
-	// Create a new LiveDataClient
+	// Create a new LiveDataClient, hooking up the visitor
 	liveDataClient := &LiveDataClient{
 		config:     config,
 		started:    false,
 		duckdbConn: duckdbConn,
 		tableName:  "trades",
 	}
+	liveDataClient.dbnVisitor = NewLiveDataVisitor(liveDataClient)
+
 	// Create output file before connecting
 	outWriter, outCloser, err := dbn.MakeCompressedWriter(config.OutFilename, false)
 	if err != nil {
@@ -167,39 +170,20 @@ func (c *LiveDataClient) FollowStream() error {
 
 	// Follow the DBN stream, writing DBN messages to the file
 	for dbnScanner.Next() && c.started {
+		// use the visitor to handle the record
+		if err := dbnScanner.Visit(c.dbnVisitor); err != nil {
+			return fmt.Errorf("failed to visit record: %w", err)
+		}
+
+		// Write the raw record to the log
 		recordBytes := dbnScanner.GetLastRecord()[:dbnScanner.GetLastSize()]
 		_, err := c.outWriter.Write(recordBytes)
 		if err != nil {
 			return fmt.Errorf("failed to write record: %w", err)
 		}
 
-		// write trade files to DuckDB
-		header, err := dbnScanner.GetLastHeader()
-		if err != nil {
-			return fmt.Errorf("failed to read header: %w", err)
-		}
-		switch header.RType {
-		case dbn.RType_Mbp0: // trade
-			tradeRecord, err := dbn.DbnScannerDecode[dbn.Mbp0Msg](dbnScanner)
-			if err != nil {
-				return fmt.Errorf("failed to read Mbp0Msg: %w", err)
-			}
-
-			err = insertTrade(c.duckdbConn, c.tableName, tradeRecord, c.dbnSymbolMap)
-			if err != nil {
-				return fmt.Errorf("failed to insert trade: %w", err)
-			}
-		case dbn.RType_SymbolMapping: // symbol mapping
-			mappingRecord, err := dbnScanner.DecodeSymbolMappingMsg()
-			if err != nil {
-				return fmt.Errorf("failed to read SymbolMappingMsg: %w", err)
-			}
-			err = c.dbnSymbolMap.OnSymbolMappingMsg(mappingRecord)
-			if err != nil {
-				return fmt.Errorf("failed to handle SymbolMappingMsg: %w", err)
-			}
-		}
 	}
+
 	if err := dbnScanner.Error(); err != nil && err != io.EOF {
 		fmt.Fprintf(os.Stderr, "scanner err: %s\n", err.Error())
 		return err
@@ -234,23 +218,93 @@ CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_timestamp_ticker_idx 
 CREATE UNIQUE INDEX IF NOT EXISTS {{.TableName}}_publisher_ticker_timestamp_idx ON {{.TableName}} (publisher, ticker, timestamp);
 `
 
-// insertTrade inserts a trade record into DuckDB
-func insertTrade(duckdbConn *sql.DB, tableName string, tradeRecord *dbn.Mbp0Msg, dbnSymbolMap *dbn.PitSymbolMap) error {
+///////////////////////////////////////////////////////////////////////////////
+
+// LiveDataVisitor is the dbn.Visitor to dispatch the clients's message handlers
+type LiveDataVisitor struct {
+	c *LiveDataClient
+}
+
+// NewLiveDataVisitor creates is an implementation of all the dbn.Visitor interface.
+func NewLiveDataVisitor(client *LiveDataClient) *LiveDataVisitor {
+	return &LiveDataVisitor{c: client}
+}
+
+// OnMbp0 will insert the trade into the client's DuckDB
+func (v *LiveDataVisitor) OnMbp0(tradeRecord *dbn.Mbp0Msg) error {
+	//func insertTrade(duckdbConn *sql.DB, tableName string, tradeRecord *dbn.Mbp0Msg, dbnSymbolMap *dbn.PitSymbolMap) error {
 	timestamp, nanos := dbn.TimestampToSecNanos(tradeRecord.Header.TsEvent) // thanks dbn-go!
 	micros := timestamp + nanos/1_000
-	ticker := dbnSymbolMap.Get(tradeRecord.Header.InstrumentID)
+	ticker := v.c.dbnSymbolMap.Get(tradeRecord.Header.InstrumentID)
 
 	sqlFormat := `INSERT INTO %s (date, timestamp, nanos, publisher, ticker, price, shares)
 VALUES (MAKE_TIMESTAMP(%d), %d, %d, %d, '%s', %f, %d)
 ON CONFLICT DO NOTHING;`
-	queryStr := fmt.Sprintf(sqlFormat, tableName,
+	queryStr := fmt.Sprintf(sqlFormat, v.c.tableName,
 		micros, timestamp, nanos, tradeRecord.Header.PublisherID,
 		ticker, dbn.Fixed9ToFloat64(tradeRecord.Price), tradeRecord.Size,
 	)
 
-	_, err := duckdbConn.Exec(queryStr)
+	_, err := v.c.duckdbConn.Exec(queryStr)
 	if err != nil {
 		return fmt.Errorf("failed to execute query: %w", err)
 	}
+	return nil
+}
+
+func (v *LiveDataVisitor) OnMbp10(record *dbn.Mbp10Msg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnMbp1(record *dbn.Mbp1Msg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnMbo(record *dbn.MboMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnOhlcv(record *dbn.OhlcvMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnCbbo(record *dbn.CbboMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnImbalance(record *dbn.ImbalanceMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnStatMsg(record *dbn.StatMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnStatusMsg(record *dbn.StatusMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnInstrumentDefMsg(record *dbn.InstrumentDefMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnErrorMsg(record *dbn.ErrorMsg) error {
+	return nil
+}
+
+func (v *LiveDataVisitor) OnSystemMsg(record *dbn.SystemMsg) error {
+	return nil
+}
+
+// OnSymbolMappingMsg will update the client's symbol map
+func (v *LiveDataVisitor) OnSymbolMappingMsg(mappingRecord *dbn.SymbolMappingMsg) error {
+	err := v.c.dbnSymbolMap.OnSymbolMappingMsg(mappingRecord)
+	if err != nil {
+		return fmt.Errorf("failed to handle SymbolMappingMsg: %w", err)
+	}
+	return nil
+}
+
+func (v *LiveDataVisitor) OnStreamEnd() error {
 	return nil
 }
