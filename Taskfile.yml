@@ -81,4 +81,4 @@ tasks:
   cruft-clean:
     desc: 'Cleans testing cruft (logs, datafiles)'
     cmds:
-      - gum confirm --default="No" "DESTRUCTIVE!!  rm -f *.db *.wal *.zst *.dbn?" && rm -f *.db *.wal *.zst *.dbn *.log
+      - gum confirm --default="No" "DESTRUCTIVE!!  rm -f *.duckdb *.wal *.zst *.dbn?" && rm -f *.duckdb *.wal *.zst *.dbn *.log

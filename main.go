@@ -26,7 +26,7 @@ import (
 
 	"database/sql"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 ///////////////////////////////////////////////////////////////////////////////

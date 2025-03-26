@@ -102,6 +102,12 @@ func NewLiveDataClient(config LiveDataConfig, duckdbConn *sql.DB) (*LiveDataClie
 	}
 
 	// Run the templated database migrations on DuckDB
+	err = middleware.RunMigration(duckdbConn, middleware.ExtensionsMigrationTemplate, middleware.MigrationInfo{
+		MigrationName: "extensionsMigration",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to run extensions migration: %w", err)
+	}
 	err = middleware.RunMigration(duckdbConn, middleware.TradeMigrationTemplate, middleware.MigrationInfo{
 		MigrationName: "tradeMigration",
 		TableName:     liveDataClient.tradesTableName,

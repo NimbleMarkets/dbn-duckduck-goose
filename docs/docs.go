@@ -85,7 +85,107 @@ const docTemplate = `{
                 }
             }
         },
-        "/last-trades/{dataset}/{ticker}": {
+        "/last-trades/csv/{dataset}/{ticker}": {
+            "get": {
+                "description": "Returns Excel file with last N trades by dataset and ticker.",
+                "produces": [
+                    "text/csv"
+                ],
+                "summary": "GET last N trades by market and ticker",
+                "operationId": "GetLastTradesByDatasetAndTickerCSV",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "DBEQ.BASIC",
+                        "description": "DataBento dataset",
+                        "name": "dataset",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "AAPL",
+                        "description": "symbol to query",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "(optional) number of trades to return - default is 25",
+                        "name": "count",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV file with last N trades",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "dataset not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/last-trades/excel/{dataset}/{ticker}": {
+            "get": {
+                "description": "Returns Excel file with last N trades by dataset and ticker.",
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "summary": "GET last N trades by market and ticker",
+                "operationId": "GetLastTradesByDatasetAndTickerExcel",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "DBEQ.BASIC",
+                        "description": "DataBento dataset",
+                        "name": "dataset",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "AAPL",
+                        "description": "symbol to query",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "(optional) number of trades to return - default is 25",
+                        "name": "count",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Excel file with last N trades",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "dataset not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/last-trades/json/{dataset}/{ticker}": {
             "get": {
                 "description": "Returns the last N trades by dataset and ticker.",
                 "produces": [

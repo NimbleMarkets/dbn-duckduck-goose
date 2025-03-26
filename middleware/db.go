@@ -18,6 +18,11 @@ type MigrationInfo struct {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// ExtenstionsMigrationTempl is the SQL format string for installing extensions
+//
+//go:embed sql/extensions.sql.tpl
+var ExtensionsMigrationTemplate string
+
 // TradeMigrationTempl is the SQL format string for trades table migration
 // Takes the "TableName"
 //

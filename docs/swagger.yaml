@@ -128,7 +128,77 @@ paths:
           description: Internal Server Error
           schema: {}
       summary: Get a time range of OHLCV for a Dataset and Ticker
-  /last-trades/{dataset}/{ticker}:
+  /last-trades/csv/{dataset}/{ticker}:
+    get:
+      description: Returns Excel file with last N trades by dataset and ticker.
+      operationId: GetLastTradesByDatasetAndTickerCSV
+      parameters:
+      - description: DataBento dataset
+        example: DBEQ.BASIC
+        in: path
+        name: dataset
+        required: true
+        type: string
+      - description: symbol to query
+        example: AAPL
+        in: path
+        name: ticker
+        required: true
+        type: string
+      - description: (optional) number of trades to return - default is 25
+        in: query
+        name: count
+        type: integer
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: CSV file with last N trades
+          schema:
+            type: string
+        "404":
+          description: dataset not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: GET last N trades by market and ticker
+  /last-trades/excel/{dataset}/{ticker}:
+    get:
+      description: Returns Excel file with last N trades by dataset and ticker.
+      operationId: GetLastTradesByDatasetAndTickerExcel
+      parameters:
+      - description: DataBento dataset
+        example: DBEQ.BASIC
+        in: path
+        name: dataset
+        required: true
+        type: string
+      - description: symbol to query
+        example: AAPL
+        in: path
+        name: ticker
+        required: true
+        type: string
+      - description: (optional) number of trades to return - default is 25
+        in: query
+        name: count
+        type: integer
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: Excel file with last N trades
+          schema:
+            type: string
+        "404":
+          description: dataset not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: GET last N trades by market and ticker
+  /last-trades/json/{dataset}/{ticker}:
     get:
       description: Returns the last N trades by dataset and ticker.
       operationId: GetLastTradesByDatasetAndTicker

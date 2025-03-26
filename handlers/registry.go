@@ -51,7 +51,9 @@ func RegisterOpenApiDocs(r *gin.Engine) *gin.Engine {
 func RegisterSnapshotApi(r *gin.RouterGroup) *gin.RouterGroup {
 	// last-trades
 	g := r.Group("/last-trades")
-	g.GET("/:dataset/:ticker", GetLastTradesByDatasetAndTicker)
+	g.GET("json/:dataset/:ticker", GetLastTradesByDatasetAndTicker)
+	g.GET("csv/:dataset/:ticker", GetLastTradesByDatasetAndTickerCSV)
+	g.GET("excel/:dataset/:ticker", GetLastTradesByDatasetAndTickerExcel)
 	// candles
 	g2 := r.Group("/candles")
 	g2.GET("/:dataset/:ticker", GetOhlcvByDatasetAndTicker)

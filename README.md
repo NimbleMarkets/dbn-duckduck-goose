@@ -34,8 +34,17 @@ $ curl -v http://localhost:8888/docs/doc.json | less
 # or open the Web GUI in in a web browser
 $ open http://localhost:8888/docs/index.html
 
-# query for latest trades
-$ curl http://localhost:8888/api/v1/last-trades/DBEQ.BASIC/QQQ
+# query for latest trades in JSON
+$ curl http://localhost:8888/api/v1/last-trades/json/DBEQ.BASIC/QQQ
+
+# query for latest trades in CSV
+$ curl http://localhost:8888/api/v1/last-trades/csv/DBEQ.BASIC/QQQ
+
+# query for latest trades in Excel
+$ curl http://localhost:8888/api/v1/last-trades/excel/DBEQ.BASIC/QQQ
+
+# query for candlesticks in JSON
+$ curl http://localhost:8888/api/v1/candles/DBEQ.BASIC/QQQ
 
 ```
 
