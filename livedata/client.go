@@ -15,15 +15,16 @@ import (
 	dbn_live "github.com/NimbleMarkets/dbn-go/live"
 )
 
-var dbnLiveSchemas = []string{"trades"}
+var dbnLiveSchemas = []string{"trades", "ohlcv-1m"}
 
 // LiveDataClient handles a DataBento live feed, writing records to a DuckDB
 type LiveDataClient struct {
 	config  LiveDataConfig
 	started bool
 
-	duckdbConn *sql.DB
-	tableName  string
+	duckdbConn       *sql.DB
+	tradesTableName  string
+	candlesTableName string
 
 	dbnClient    *dbn_live.LiveClient
 	dbnVisitor   *LiveDataVisitor
@@ -39,10 +40,11 @@ type LiveDataClient struct {
 func NewLiveDataClient(config LiveDataConfig, duckdbConn *sql.DB) (*LiveDataClient, error) {
 	// Create a new LiveDataClient, hooking up the visitor
 	liveDataClient := &LiveDataClient{
-		config:     config,
-		started:    false,
-		duckdbConn: duckdbConn,
-		tableName:  "trades",
+		config:           config,
+		started:          false,
+		duckdbConn:       duckdbConn,
+		tradesTableName:  "trades",
+		candlesTableName: "candles",
 	}
 	liveDataClient.dbnVisitor = NewLiveDataVisitor(liveDataClient)
 
@@ -102,11 +104,17 @@ func NewLiveDataClient(config LiveDataConfig, duckdbConn *sql.DB) (*LiveDataClie
 	// Run the templated database migrations on DuckDB
 	err = middleware.RunMigration(duckdbConn, middleware.TradeMigrationTemplate, middleware.MigrationInfo{
 		MigrationName: "tradeMigration",
-		TableName:     liveDataClient.tableName,
+		TableName:     liveDataClient.tradesTableName,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run trade migration: %w", err)
-
+	}
+	err = middleware.RunMigration(duckdbConn, middleware.CandlesMigrationTemplate, middleware.MigrationInfo{
+		MigrationName: "candleMigration",
+		TableName:     liveDataClient.candlesTableName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to run candle migration: %w", err)
 	}
 
 	// Start DataBento Live session
@@ -208,14 +216,14 @@ func (v *LiveDataVisitor) OnMbp0(tradeRecord *dbn.Mbp0Msg) error {
 	sqlFormat := `INSERT INTO %s (date, timestamp, nanos, publisher, ticker, price, shares)
 VALUES (MAKE_TIMESTAMP(%d), %d, %d, %d, '%s', %f, %d)
 ON CONFLICT DO NOTHING;`
-	queryStr := fmt.Sprintf(sqlFormat, v.c.tableName,
+	queryStr := fmt.Sprintf(sqlFormat, v.c.tradesTableName,
 		micros, timestamp, nanos, tradeRecord.Header.PublisherID,
 		ticker, dbn.Fixed9ToFloat64(tradeRecord.Price), tradeRecord.Size,
 	)
 
 	_, err := v.c.duckdbConn.Exec(queryStr)
 	if err != nil {
-		return fmt.Errorf("failed to execute query: %w", err)
+		return fmt.Errorf("failed to insert trade: %w", err)
 	}
 	return nil
 }
@@ -232,7 +240,27 @@ func (v *LiveDataVisitor) OnMbo(record *dbn.MboMsg) error {
 	return nil
 }
 
-func (v *LiveDataVisitor) OnOhlcv(record *dbn.OhlcvMsg) error {
+func (v *LiveDataVisitor) OnOhlcv(ohlcvRecord *dbn.OhlcvMsg) error {
+	timestamp, nanos := dbn.TimestampToSecNanos(ohlcvRecord.Header.TsEvent) // thanks dbn-go!
+	micros := timestamp + nanos/1_000
+	ticker := v.c.dbnSymbolMap.Get(ohlcvRecord.Header.InstrumentID)
+
+	sqlFormat := `INSERT INTO %s (date, timestamp, nanos, publisher, ticker, volume, open, high, low, close)
+VALUES (MAKE_TIMESTAMP(%d), %d, %d, %d, '%s', %d, %f, %f, %f, %f)
+ON CONFLICT DO NOTHING;`
+	queryStr := fmt.Sprintf(sqlFormat, v.c.candlesTableName,
+		micros, timestamp, nanos, ohlcvRecord.Header.PublisherID,
+		ticker, ohlcvRecord.Volume,
+		dbn.Fixed9ToFloat64(ohlcvRecord.Open),
+		dbn.Fixed9ToFloat64(ohlcvRecord.High),
+		dbn.Fixed9ToFloat64(ohlcvRecord.Low),
+		dbn.Fixed9ToFloat64(ohlcvRecord.Close),
+	)
+
+	_, err := v.c.duckdbConn.Exec(queryStr)
+	if err != nil {
+		return fmt.Errorf("failed to execute insert candle: %w", err)
+	}
 	return nil
 }
 

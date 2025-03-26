@@ -21,6 +21,67 @@
     "host": "api.example.com",
     "basePath": "/api/v1",
     "paths": {
+        "/candles/{dataset}/{ticker}": {
+            "get": {
+                "description": "Returns a time range of OHLCV for a Dataset and Ticker",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get a time range of OHLCV for a Dataset and Ticker",
+                "operationId": "GetOhlcvByDatasetAndTicker",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "DBEQ.BASIC",
+                        "description": "DataBento dataset",
+                        "name": "dataset",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "AAPL",
+                        "description": "symbol to query",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "ISO8601",
+                        "description": "(optional) start of date range in ISO8601. Default is midnight Eastern.",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "ISO8601",
+                        "description": "(optional) end of date range in ISO8601. Default is now.",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "array of Candles",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/sdk.Candle"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "dataset not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/last-trades/{dataset}/{ticker}": {
             "get": {
                 "description": "Returns the last N trades by dataset and ticker.",
@@ -76,6 +137,56 @@
         }
     },
     "definitions": {
+        "sdk.Candle": {
+            "type": "object",
+            "properties": {
+                "close": {
+                    "description": "Close price of candlestick",
+                    "type": "number",
+                    "example": 214.21
+                },
+                "high": {
+                    "description": "High price of candlestick",
+                    "type": "number",
+                    "example": 214.21
+                },
+                "low": {
+                    "description": "Low price of candlestick",
+                    "type": "number",
+                    "example": 214.21
+                },
+                "ns": {
+                    "description": "Nanoseconds portion of the event timestamp",
+                    "type": "integer",
+                    "example": 123456
+                },
+                "open": {
+                    "description": "Open price of candlestick",
+                    "type": "number",
+                    "example": 214.21
+                },
+                "pub": {
+                    "description": "DataBento Publisher ID",
+                    "type": "integer",
+                    "example": 1
+                },
+                "sym": {
+                    "description": "Ticker of the trade",
+                    "type": "string",
+                    "example": "AAPL"
+                },
+                "ts": {
+                    "description": "Trade event timestamp as seconds from the epoch",
+                    "type": "string",
+                    "example": "1713644400"
+                },
+                "volume": {
+                    "description": "Volume in candlestick",
+                    "type": "integer",
+                    "example": 100
+                }
+            }
+        },
         "sdk.TradeTick": {
             "type": "object",
             "properties": {

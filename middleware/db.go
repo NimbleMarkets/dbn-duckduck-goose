@@ -16,11 +16,21 @@ type MigrationInfo struct {
 	TableName     string
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 // TradeMigrationTempl is the SQL format string for trades table migration
 // Takes the "TableName"
 //
 //go:embed sql/trades.sql.tpl
 var TradeMigrationTemplate string
+
+// candlesMigrationTempl is the SQL format string for candles table migration
+// Takes the "TableName"
+//
+//go:embed sql/candles.sql.tpl
+var CandlesMigrationTemplate string
+
+///////////////////////////////////////////////////////////////////////////////
 
 // RunMigration executes the templated migration string on the DuckDB connection.
 // Returns an error, if any.

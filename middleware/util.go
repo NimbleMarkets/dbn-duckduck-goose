@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -46,4 +48,29 @@ func ValidatePositiveNonzeroInteger(str string) (int, error) {
 	}
 
 	return num, nil
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+var (
+	easternLocation *time.Location
+	once            sync.Once
+)
+
+// Returns the Eastern (America/NewYork) time zone time.Location
+func EasternLocation() *time.Location {
+	once.Do(func() {
+		var err error
+		easternLocation, err = time.LoadLocation("America/New_York")
+		if err != nil {
+			panic(fmt.Errorf("failed to load Eastern location: %w", err))
+		}
+	})
+	return easternLocation
+}
+
+// NowEST returns the time.Now() in America/NewYork
+func NowEST() time.Time {
+	loc := EasternLocation()
+	return time.Now().In(loc)
 }

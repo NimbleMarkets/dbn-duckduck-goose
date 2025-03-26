@@ -1,5 +1,44 @@
 basePath: /api/v1
 definitions:
+  sdk.Candle:
+    properties:
+      close:
+        description: Close price of candlestick
+        example: 214.21
+        type: number
+      high:
+        description: High price of candlestick
+        example: 214.21
+        type: number
+      low:
+        description: Low price of candlestick
+        example: 214.21
+        type: number
+      ns:
+        description: Nanoseconds portion of the event timestamp
+        example: 123456
+        type: integer
+      open:
+        description: Open price of candlestick
+        example: 214.21
+        type: number
+      pub:
+        description: DataBento Publisher ID
+        example: 1
+        type: integer
+      sym:
+        description: Ticker of the trade
+        example: AAPL
+        type: string
+      ts:
+        description: Trade event timestamp as seconds from the epoch
+        example: "1713644400"
+        type: string
+      volume:
+        description: Volume in candlestick
+        example: 100
+        type: integer
+    type: object
   sdk.TradeTick:
     properties:
       mkt:
@@ -45,6 +84,50 @@ info:
   title: dbn-duckduck-goose
   version: "1.0"
 paths:
+  /candles/{dataset}/{ticker}:
+    get:
+      description: Returns a time range of OHLCV for a Dataset and Ticker
+      operationId: GetOhlcvByDatasetAndTicker
+      parameters:
+      - description: DataBento dataset
+        example: DBEQ.BASIC
+        in: path
+        name: dataset
+        required: true
+        type: string
+      - description: symbol to query
+        example: AAPL
+        in: path
+        name: ticker
+        required: true
+        type: string
+      - description: (optional) start of date range in ISO8601. Default is midnight
+          Eastern.
+        format: ISO8601
+        in: query
+        name: start
+        type: string
+      - description: (optional) end of date range in ISO8601. Default is now.
+        format: ISO8601
+        in: query
+        name: end
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: array of Candles
+          schema:
+            items:
+              $ref: '#/definitions/sdk.Candle'
+            type: array
+        "404":
+          description: dataset not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get a time range of OHLCV for a Dataset and Ticker
   /last-trades/{dataset}/{ticker}:
     get:
       description: Returns the last N trades by dataset and ticker.
