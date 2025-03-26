@@ -210,11 +210,11 @@ func NewLiveDataVisitor(client *LiveDataClient) *LiveDataVisitor {
 // OnMbp0 will insert the trade into the client's DuckDB
 func (v *LiveDataVisitor) OnMbp0(tradeRecord *dbn.Mbp0Msg) error {
 	timestamp, nanos := dbn.TimestampToSecNanos(tradeRecord.Header.TsEvent) // thanks dbn-go!
-	micros := timestamp + nanos/1_000
+	micros := timestamp*1_000_000 + nanos/1_000
 	ticker := v.c.dbnSymbolMap.Get(tradeRecord.Header.InstrumentID)
 
 	sqlFormat := `INSERT INTO %s (date, timestamp, nanos, publisher, ticker, price, shares)
-VALUES (MAKE_TIMESTAMP(%d), %d, %d, %d, '%s', %f, %d)
+VALUES (MAKE_TIMESTAMP(%d)::DATE, %d, %d, %d, '%s', %f, %d)
 ON CONFLICT DO NOTHING;`
 	queryStr := fmt.Sprintf(sqlFormat, v.c.tradesTableName,
 		micros, timestamp, nanos, tradeRecord.Header.PublisherID,
@@ -242,11 +242,11 @@ func (v *LiveDataVisitor) OnMbo(record *dbn.MboMsg) error {
 
 func (v *LiveDataVisitor) OnOhlcv(ohlcvRecord *dbn.OhlcvMsg) error {
 	timestamp, nanos := dbn.TimestampToSecNanos(ohlcvRecord.Header.TsEvent) // thanks dbn-go!
-	micros := timestamp + nanos/1_000
+	micros := timestamp*1_000_000 + nanos/1_000
 	ticker := v.c.dbnSymbolMap.Get(ohlcvRecord.Header.InstrumentID)
 
 	sqlFormat := `INSERT INTO %s (date, timestamp, nanos, publisher, ticker, volume, open, high, low, close)
-VALUES (MAKE_TIMESTAMP(%d), %d, %d, %d, '%s', %d, %f, %f, %f, %f)
+VALUES (MAKE_TIMESTAMP(%d)::DATE, %d, %d, %d, '%s', %d, %f, %f, %f, %f)
 ON CONFLICT DO NOTHING;`
 	queryStr := fmt.Sprintf(sqlFormat, v.c.candlesTableName,
 		micros, timestamp, nanos, ohlcvRecord.Header.PublisherID,
