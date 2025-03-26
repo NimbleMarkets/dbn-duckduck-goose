@@ -53,6 +53,7 @@ tasks:
       - go.sum
 
   server-swag-v2: 
+    desc: 'Build Swagger docs (OpenAPI v2)'
     cmds:
       - swag init --parseDependency --parseDepth 2 -o ./docs -g ./main.go
     sources:
@@ -71,7 +72,13 @@ tasks:
       - rm -f docs/docs.go docs/swagger.json docs/swagger.yaml
 
   clean:
-    desc: 'Clean all'
+    desc: 'Clean all build products'
     deps: [swag-clean]
     cmds:
       - rm -f bin/dbn-duckduck-goose
+
+  # requires Gum: https://github.com/charmbracelet/gum
+  cruft-clean:
+    desc: 'Cleans testing cruft (logs, datafiles)'
+    cmds:
+      - gum confirm --default="No" "DESTRUCTIVE!!  rm -f *.db *.wal *.zst *.dbn?" && rm -f *.db *.wal *.zst *.dbn *.log

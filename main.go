@@ -150,7 +150,7 @@ func main() {
 		defer wg.Done()
 		logger.Info("LiveDataClient following DataBento Live Stream", zap.String("dataset", config.LiveConfig.Dataset))
 		if err := liveDataClient.FollowStream(); err != nil {
-			logger.Error("LiveDataClient error: %s\n", zap.Error(err))
+			logger.Error("LiveDataClient error:", zap.Error(err))
 		}
 	}()
 

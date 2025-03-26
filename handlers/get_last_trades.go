@@ -53,8 +53,8 @@ func GetLastTradesByDatasetAndTicker(c *gin.Context) {
 	// perform the query
 	results, err := queryLastTradesByDatasetAndTicker(ticker, dataset, count)
 	if err != nil {
-		error := fmt.Sprintf("getTradeTicksByTickerMarket error for ticker:%s dataset:%s", ticker, dataset)
-		middleware.InternalError(c, error, err)
+		errorMsg := fmt.Sprintf("getTradeTicksByTickerMarket error for ticker:%s dataset:%s", ticker, dataset)
+		middleware.InternalError(c, errorMsg, err)
 		return
 	}
 	if len(results) == 0 {
@@ -63,7 +63,7 @@ func GetLastTradesByDatasetAndTicker(c *gin.Context) {
 	c.JSON(http.StatusOK, results)
 }
 
-// queryLastTradesByDatasetAndTicker stub for actual implementation later
+// queryLastTradesByDatasetAndTicker selects the trades from the database
 func queryLastTradesByDatasetAndTicker(ticker string, dataset string, count int) ([]*sdk.TradeTick, error) {
 	if count <= 0 {
 		count = defaultCountArg
