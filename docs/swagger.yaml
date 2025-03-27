@@ -32,8 +32,8 @@ definitions:
         type: string
       ts:
         description: Trade event timestamp as seconds from the epoch
-        example: "1713644400"
-        type: string
+        example: 1713644400
+        type: integer
       volume:
         description: Volume in candlestick
         example: 100
@@ -67,8 +67,8 @@ definitions:
         type: integer
       ts:
         description: Trade event timestamp as seconds from the epoch
-        example: "1713644400"
-        type: string
+        example: 1713644400
+        type: integer
     type: object
 host: api.example.com
 info:
@@ -128,6 +128,50 @@ paths:
           description: Internal Server Error
           schema: {}
       summary: Get a time range of OHLCV for a Dataset and Ticker
+  /charts/candles/{dataset}/{ticker}:
+    get:
+      description: Returns an HTML page candlestick chart with volume and EMA for
+        the given dataset and ticker.
+      operationId: GetCandleChartByDatasetAndTicker
+      parameters:
+      - description: DataBento dataset
+        example: DBEQ.BASIC
+        in: path
+        name: dataset
+        required: true
+        type: string
+      - description: symbol to query
+        example: AAPL
+        in: path
+        name: ticker
+        required: true
+        type: string
+      - description: (optional) start of date range in ISO8601. Default is midnight
+          Eastern.
+        format: ISO8601
+        in: query
+        name: start
+        type: string
+      - description: (optional) end of date range in ISO8601. Default is now.
+        format: ISO8601
+        in: query
+        name: end
+        type: string
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page with candlestick chart
+          schema:
+            type: string
+        "404":
+          description: dataset not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Returns an HTML page candlestick chart with volume and EMA for the
+        given dataset and ticker.
   /last-trades/csv/{dataset}/{ticker}:
     get:
       description: Returns Excel file with last N trades by dataset and ticker.

@@ -9,7 +9,7 @@ package sdk
 
 // TradeTick is a trade tick event datum.
 type TradeTick struct {
-	Timestamp   string  `json:"ts" example:"1713644400"`      // Trade event timestamp as seconds from the epoch
+	Timestamp   int64   `json:"ts" example:"1713644400"`      // Trade event timestamp as seconds from the epoch
 	Nanos       int64   `json:"ns" example:"123456"`          // Nanoseconds portion of the event timestamp
 	PublisherID uint16  `json:"pub" example:"1"`              // DataBento Publisher ID
 	Ticker      string  `json:"sym,omitempty" example:"AAPL"` // Ticker of the trade
@@ -20,7 +20,7 @@ type TradeTick struct {
 
 // Candle is a OHLCV event datum.
 type Candle struct {
-	Timestamp   string  `json:"ts" example:"1713644400"`      // Trade event timestamp as seconds from the epoch
+	Timestamp   int64   `json:"ts" example:"1713644400"`      // Trade event timestamp as seconds from the epoch
 	Nanos       int64   `json:"ns" example:"123456"`          // Nanoseconds portion of the event timestamp
 	PublisherID uint16  `json:"pub" example:"1"`              // DataBento Publisher ID
 	Ticker      string  `json:"sym,omitempty" example:"AAPL"` // Ticker of the trade

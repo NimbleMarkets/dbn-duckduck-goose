@@ -44,6 +44,7 @@ tasks:
     sources:
       - "*.go"
       - "handlers/**/*.go"
+      - "handlers/js/*.js"
       - "livedata/**/*.go"
       - "middleware/**/*.go"
       - "middleware/sql/*.tpl"

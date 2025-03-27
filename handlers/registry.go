@@ -57,5 +57,8 @@ func RegisterSnapshotApi(r *gin.RouterGroup) *gin.RouterGroup {
 	// candles
 	g2 := r.Group("/candles")
 	g2.GET("/:dataset/:ticker", GetOhlcvByDatasetAndTicker)
+	// charts
+	g3 := r.Group("/charts")
+	g3.GET("candles/:dataset/:ticker", GetCandleChartByDatasetAndTicker)
 	return r
 }

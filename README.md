@@ -14,6 +14,8 @@ Open source technologies used include:
  * [Swaggo's `swag`](https://github.com/swaggo/swag) for code-driven OpenAPI generation
  * [Gin](https://gin-gonic.com/docs/) for the web service framework
  * [`dbn-go`](https://github.com/NimbleMarkets/dbn-go) for DataBento Golang support
+ * [Apache ECharts](https://echarts.apache.org/en/index.html) for JavaScript charting
+ * [`go-echarts`](https://go-echarts.github.io/go-echarts/#/) for Golang bindings to ECharts
 
 *CAUTION: This program incurs DataBento billing!*
 
@@ -31,21 +33,23 @@ $ ./bin/dbn-duckduck-goose --dataset DBEQ.BASIC --out qqq.dbn.zst QQQ
 # then in another terminal, read the specification
 $ curl -v http://localhost:8888/docs/doc.json | less
 
-# or open the Web GUI in in a web browser
+# or open the Web GUI in a web browser
 $ open http://localhost:8888/docs/index.html
 
-# query for latest trades in JSON
+# query for latest trades as JSON
 $ curl http://localhost:8888/api/v1/last-trades/json/DBEQ.BASIC/QQQ
 
-# query for latest trades in CSV
+# query for latest trades as CSV
 $ curl http://localhost:8888/api/v1/last-trades/csv/DBEQ.BASIC/QQQ
 
-# query for latest trades in Excel
+# query for latest trades as Excel
 $ curl http://localhost:8888/api/v1/last-trades/excel/DBEQ.BASIC/QQQ
 
-# query for candlesticks in JSON
+# query for candlesticks as JSON
 $ curl http://localhost:8888/api/v1/candles/DBEQ.BASIC/QQQ
 
+# interact with a chart in a web browser
+$ open http://localhost:8888/api/v1/charts/candles/DBEQ.BASIC/SPY
 ```
 
 ## Usage

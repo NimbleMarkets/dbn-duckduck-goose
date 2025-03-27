@@ -82,7 +82,7 @@ func queryCandlesByDatasetAndTicker(ticker string, dataset string, startTime tim
 	queryStr := `SELECT timestamp, nanos, publisher, ticker, volume,
 CAST(open AS DOUBLE), CAST(high AS DOUBLE), CAST(low AS DOUBLE), CAST(close AS DOUBLE)
 FROM candles
-WHERE ticker = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC;`
+WHERE ticker = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp;`
 	rows, err := gDuckdbConn.QueryContext(context.Background(), queryStr, ticker, startTime.Unix(), endTime.Unix()+1)
 	if err != nil {
 		return nil, err

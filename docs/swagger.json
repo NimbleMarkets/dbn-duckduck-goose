@@ -82,6 +82,64 @@
                 }
             }
         },
+        "/charts/candles/{dataset}/{ticker}": {
+            "get": {
+                "description": "Returns an HTML page candlestick chart with volume and EMA for the given dataset and ticker.",
+                "produces": [
+                    "text/html"
+                ],
+                "summary": "Returns an HTML page candlestick chart with volume and EMA for the given dataset and ticker.",
+                "operationId": "GetCandleChartByDatasetAndTicker",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "DBEQ.BASIC",
+                        "description": "DataBento dataset",
+                        "name": "dataset",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "AAPL",
+                        "description": "symbol to query",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "ISO8601",
+                        "description": "(optional) start of date range in ISO8601. Default is midnight Eastern.",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "ISO8601",
+                        "description": "(optional) end of date range in ISO8601. Default is now.",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML page with candlestick chart",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "dataset not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/last-trades/csv/{dataset}/{ticker}": {
             "get": {
                 "description": "Returns Excel file with last N trades by dataset and ticker.",
@@ -277,8 +335,8 @@
                 },
                 "ts": {
                     "description": "Trade event timestamp as seconds from the epoch",
-                    "type": "string",
-                    "example": "1713644400"
+                    "type": "integer",
+                    "example": 1713644400
                 },
                 "volume": {
                     "description": "Volume in candlestick",
@@ -322,8 +380,8 @@
                 },
                 "ts": {
                     "description": "Trade event timestamp as seconds from the epoch",
-                    "type": "string",
-                    "example": "1713644400"
+                    "type": "integer",
+                    "example": 1713644400
                 }
             }
         }

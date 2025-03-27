@@ -116,10 +116,12 @@ func GetLastTradesByDatasetAndTickerExcel(c *gin.Context) {
 		middleware.InternalError(c, errorMsg, err)
 		return
 	}
+
+	// Transmit the file
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.File(tempFile)
 
-	// delete the temporary file
+	// Delete the temporary file
 	err = os.Remove(tempFile)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to remove temp file: %s %w", tempFile, err))
@@ -159,7 +161,7 @@ func queryLastTradesByDatasetAndTicker(ticker string, dataset string, count int)
 		count = defaultCountArg
 	}
 	queryStr := `SELECT timestamp, nanos, publisher, ticker, CAST(price AS DOUBLE) AS price, shares FROM trades
-WHERE ticker = ? ORDER BY timestamp DESC LIMIT ?;`
+WHERE ticker = ? ORDER BY timestamp LIMIT ?;`
 
 	// query the global DuckDB connection
 	rows, err := gDuckdbConn.QueryContext(context.Background(), queryStr, ticker, count)
@@ -184,7 +186,7 @@ WHERE ticker = ? ORDER BY timestamp DESC LIMIT ?;`
 // Returns the temporary filename, or an error if any. It is the caller's responsibility to delete the file.
 func copyLastTradesByDatasetAndTickerFormatted(format string, ticker string, dataset string, count int) (string, error) {
 	// Grab a temporary file for destination
-	tempFile, err := os.CreateTemp("", fmt.Sprintf("trades-%s", format))
+	tempFile, err := os.CreateTemp("", fmt.Sprintf("trades-*.%s", format))
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -194,7 +196,7 @@ func copyLastTradesByDatasetAndTickerFormatted(format string, ticker string, dat
 		count = defaultCountArg
 	}
 	queryStr := fmt.Sprintf(`COPY (SELECT MAKE_TIMESTAMP(CAST(timestamp AS BIGINT)*1_000_000) AS time, publisher, ticker, CAST(price AS DOUBLE) AS price, shares FROM trades
-WHERE ticker = ? ORDER BY timestamp DESC LIMIT ?)
+WHERE ticker = ? ORDER BY timestamp LIMIT ?)
 TO '%s' WITH (FORMAT %s, HEADER true);`, tempFile.Name(), format)
 
 	// execute the command on global DuckDB connection

@@ -6,6 +6,7 @@ require (
 	github.com/NimbleMarkets/dbn-go v0.4.1
 	github.com/gin-contrib/zap v1.1.4
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-echarts/go-echarts/v2 v2.5.2
 	github.com/marcboeker/go-duckdb/v2 v2.1.0
 	github.com/penglongli/gin-metrics v0.1.13
 	github.com/relvacode/iso8601 v1.6.0
