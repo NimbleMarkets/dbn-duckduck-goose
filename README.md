@@ -84,7 +84,26 @@ usage: ./bin/dbn-duckduck-goose -d <dataset> [opts] symbol1 symbol2 ...
   -o, --out string        Output filename for DBN stream ('-' for stdout)
   -n, --snapshot          Enable snapshot on subscription request
   -t, --start string      Start time to request as ISO 8601 format (default: now)
-  -v, --verbose           Verbose logging```
+  -v, --verbose           Verbose logging
+```
+
+There is also a [Dockerfile](./Dockerfile) which is built by [GitHub Actions](https://github.com/NimbleMarkets/dbn-duckduck-goose/actions).  It can be run with:
+
+```
+$ export DATABENTO_API_KEY="<your_api_key>"
+$ mkdir logs
+$ docker run -it \
+      --env DATABENTO_API_KEY \
+      --volume logs:/logs \
+      --publish 8888:8888 \
+    ghcr.io/nimblemarkets/dbn-duckduck-goose \
+      --dataset DBEQ.BASIC \
+      --out /logs/test.dbn.zst
+      --db /logs/test.duckdb
+      --hostport 0.0.0.0:8888
+```
+
+Here we are pulling the image from GitHub, storing the log files in the bind-mounted `logs` directory, and exposing the web service on port `8888`.  The `--hostport 0.0.0.0:8888` ensures that the web service binds a public interface of the container, otherwise it will bind the container's internal, inaccessible `localhost`.
 
 
 ## Building the project
@@ -97,6 +116,7 @@ $ brew install go-task/tap/go-task
 $ task dev-deps
 $ task build
 ```
+
 
 ## License
 

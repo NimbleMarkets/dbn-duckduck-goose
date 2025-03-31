@@ -83,3 +83,9 @@ tasks:
     desc: 'Cleans testing cruft (logs, datafiles)'
     cmds:
       - gum confirm --default="No" "DESTRUCTIVE!!  rm -f *.duckdb *.wal *.zst *.dbn?" && rm -f *.duckdb *.wal *.zst *.dbn *.log
+
+  docker-build:
+    desc: 'Build Docker image'
+    deps: [tidy]
+    cmds:
+      - docker build .
