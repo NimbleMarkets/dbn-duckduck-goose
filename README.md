@@ -4,7 +4,9 @@
 
 *https://github.com/NimbleMarkets/dbn-duckduck-goose*
 
-This `dbn-duckduck-goose` repository contains an example Golang webservice tha uses [Databento's](https://databento.com) data-as-a-service backend and embedded [DuckDB](https://duckdb.org) for storage and query.  
+This `dbn-duckduck-goose` repository contains an example Golang webservice that uses [Databento's](https://databento.com) data-as-a-service backend and embedded [DuckDB](https://duckdb.org) for storage and query.  
+
+<p><a href="./etc/swagger_console.png"><img src="./etc/swagger_console.png" alt="OpenAPI Console" width="40%" valign="middle"></a>&nbsp;<a href="./etc/dbeqbasic.SPY.html"><img src="./etc/dbeqbasic.SPY.png" alt="Candlestick Chart" width="50%" valign="middle"></a></p>
 
 Open source technologies used include:
  * [Golang](https://golang.org) for the programming language
@@ -16,11 +18,14 @@ Open source technologies used include:
  * [`dbn-go`](https://github.com/NimbleMarkets/dbn-go) for DataBento Golang support
  * [Apache ECharts](https://echarts.apache.org/en/index.html) for JavaScript charting
  * [`go-echarts`](https://go-echarts.github.io/go-echarts/#/) for Golang bindings to ECharts
+ * [Taskfile](https://taskfile.dev) task runner
 
 *CAUTION: This program incurs DataBento billing!*
 
+
 ## Example
 
+Build and run the `dbn-duckduck-goose` server:
 ```bash
 $ git clone https://github.com/NimbleMarkets/dbn-duckduck-go.git
 $ cd dbn-duckduck-go
@@ -29,8 +34,12 @@ $ task build
 # run server
 $ export DATABENTO_API_KEY="<your_api_key>"
 $ ./bin/dbn-duckduck-goose --dataset DBEQ.BASIC --out qqq.dbn.zst QQQ
+```
 
-# then in another terminal, read the specification
+Then test in another terminal or a web browser:
+
+```bash
+# read the specification
 $ curl -v http://localhost:8888/docs/doc.json | less
 
 # or open the Web GUI in a web browser
@@ -51,6 +60,9 @@ $ curl http://localhost:8888/api/v1/candles/DBEQ.BASIC/QQQ
 # interact with a chart in a web browser
 $ open http://localhost:8888/api/v1/charts/candles/DBEQ.BASIC/SPY
 ```
+
+Since those charts are self-contained, we've bundled an [SPY chart example here](./etc/dbeqbasic.SPY.html) for you to try out. 
+
 
 ## Usage
 
